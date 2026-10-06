@@ -1,0 +1,70 @@
+name: Release
+
+# Cut a release by pushing a version tag:
+#   git tag v0.2.0 && git push origin v0.2.0
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history and tags, for the changelog
+
+      - name: Stamp the version into Info.plist
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${GITHUB_REF_NAME#v}" Support/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Support/Info.plist
+
+      - name: Build
+        run: make build
+
+      - name: Package a DMG
+        run: |
+          DMG="Mooter-${GITHUB_REF_NAME}.dmg"
+          STAGING="$(mktemp -d)"
+          cp -R build/Mooter.app "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create -volname Mooter -srcfolder "$STAGING" -fs HFS+ -format UDZO -ov "$DMG"
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest
+        env:
+          OUTPUT: release-notes.md
+
+      - name: Append install instructions
+        run: |
+          cat >> release-notes.md <<'EOF'
+
+          ---
+
+          ### Install
+
+          1. Open the DMG and drag **Mooter.app** into **Applications**.
+          2. Mooter is ad-hoc signed, not notarized, so clear the quarantine flag:
+             ```sh
+             xattr -dr com.apple.quarantine /Applications/Mooter.app
+             ```
+          3. Launch it and allow **System Audio Recording** when macOS asks.
+
+          Requires **macOS 26 (Tahoe)** on **Apple Silicon**.
+          EOF
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Mooter ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: ${{ env.DMG }}
+          fail_on_unmatched_files: true
