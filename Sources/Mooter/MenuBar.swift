@@ -60,9 +60,9 @@ final class MenuBar: NSObject, NSPopoverDelegate {
     }
 }
 
-private extension NSImage {
-    /// A cow's face: ears, horns, eyes and a big muzzle. A template, so it
-    /// follows the menu bar's appearance.
+extension NSImage {
+    /// A cow's face: ears, horns, eyes and a big muzzle. Used in the menu bar and the
+    /// popover header, as a template so it follows the appearance.
     static let cow: NSImage = {
         let image = NSImage(size: NSSize(width: 20, height: 18), flipped: true) { _ in
             func oval(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> NSBezierPath {
